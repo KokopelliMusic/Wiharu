@@ -1,6 +1,8 @@
 start:
 	npx react-scripts start
 
-build:
+build: lint
 	npx react-scripts build
 
+lint:
+	npx eslint . --ext .ts
