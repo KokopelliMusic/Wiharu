@@ -5,4 +5,4 @@ build: lint
 	npx react-scripts build
 
 lint:
-	npx eslint . --ext .ts
+	npx eslint --fix --ext .tsx,.ts,.js src
