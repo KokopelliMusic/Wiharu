@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { EventTypes, SessionCreatedEventData } from 'sipapu/dist/src/events'
+import { saveCode, saveSettings, saveSpotify, saveUid } from '../data'
 import FullscreenLoading from './FullscreenLoading'
 
 const LOADING_TIMEOUT = 2500
@@ -20,11 +22,21 @@ const Home = () => {
 
     window.sipapu.Session.setSessionId(code)
 
-    alert('watching ' + code)
-
-    const cleanup = window.sipapu.Session.watch(code, event => {
-      console.log(event)
-
+    const cleanup = window.sipapu.Session.watch(code, async event => {
+      if (event.eventType === EventTypes.SESSION_CREATED) {
+        // Session has been claimed, so save this info and redirect to the player
+        const d = JSON.parse(event.data as unknown as string) as SessionCreatedEventData
+        if (!d.error) {
+          saveSettings(d.settings)
+          saveCode(event.session)
+          saveUid(d.userId)
+          saveSpotify({ accessToken: d.spotifyAccessToken, refreshToken: d.spotifyRefreshToken })
+          window.location.href = '/player'
+        } else {
+          console.error('Something went wrong with this event:', event)
+          alert('Something went wrong, try reloading')
+        }
+      }
     })
 
     // this is a very interesting cleanup function lol
