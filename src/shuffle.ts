@@ -1,13 +1,18 @@
 import { PlaylistWithSongsType } from 'sipapu/dist/src/services/playlist'
+import { SongType } from 'sipapu/dist/src/services/song'
 
 /**
  * Shuffle the events according to the 'Random' algorithm
  * This is shit
  */
-export const shuffleRandomWithoutEvents = (playlist: PlaylistWithSongsType) => {
+export const shuffleRandomWithoutEvents = (playlist: PlaylistWithSongsType): SongType[] => {
   const shuffled = knuthShuffle(playlist.songs)
 
   return shuffled
+}
+
+export const classicShuffle = (playlist: Playlist): SongType[] => {
+  // TODO
 }
 
 /**
@@ -15,7 +20,7 @@ export const shuffleRandomWithoutEvents = (playlist: PlaylistWithSongsType) => {
  * https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
  * https://stackoverflow.com/questions/2450954/how-to-randomize-shuffle-a-javascript-array
  */
-const knuthShuffle = (array: unknown[]) => {
+function knuthShuffle<T>(array: T[]): T[] {
   let currentIndex = array.length
   let randomIndex
 
