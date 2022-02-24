@@ -1,9 +1,12 @@
 import { PlaylistWithSongsType } from 'sipapu/dist/src/services/playlist'
+import { SessionType } from 'sipapu/dist/src/services/session'
 import { SongType } from 'sipapu/dist/src/services/song'
 import { getWeights, saveWeights } from './data'
 
 const SHUFFLE_LENGTH = 10
 const MAX_PLAY_COUNT = 2
+
+export type PlayerEvent = SongType | 'adtrad'
 
 /**
  * Shuffle the events according to the 'Random' algorithm
@@ -157,10 +160,10 @@ export const modernShuffle = (p: PlaylistWithSongsType): SongType[] => {
  * This algorithm favors songs with a lower playCount
  * @returns an array of 10 SongType objects
  */
-export const shuffleWeightedSong = (playlist: PlaylistWithSongsType): SongType[] => {
+export const shuffleWeightedSong = (playlist: PlaylistWithSongsType, length?: number): SongType[] => {
   const songs = playlist.songs
   const shuffled = weightedSongShuffle(playlist.id, songs)
-  return shuffled.slice(0, SHUFFLE_LENGTH)
+  return shuffled.slice(0, length ?? SHUFFLE_LENGTH)
 }
  
 const resetPlayCount = (playlistId: number, songs: SongType[]): SongType[] => {
@@ -169,6 +172,16 @@ const resetPlayCount = (playlistId: number, songs: SongType[]): SongType[] => {
     song.playCount = 0
     return song
   })
+}
+
+export const shuffleWeightedSongWithEvents = (playlist: PlaylistWithSongsType, session: SessionType): PlayerEvent[] => {
+  const queue: PlayerEvent[] = shuffleWeightedSong(playlist, session.settings.eventFrequency)
+  
+  if (session.settings.allowEvents) {
+    queue.push('adtrad')
+  }
+
+  return queue
 }
 
 /**

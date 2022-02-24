@@ -2,11 +2,13 @@
 import React, { useEffect, useState } from 'react'
 import SpotifyWebPlayback from 'react-spotify-web-playback-sdk-headless'
 import { EventTypes } from 'sipapu/dist/src/events'
+import { PlaylistWithSongsType } from 'sipapu/dist/src/services/playlist'
 import { ProfileType } from 'sipapu/dist/src/services/profile'
 import { SessionType } from 'sipapu/dist/src/services/session'
-import { SongType } from 'sipapu/dist/src/services/song'
+import { SongEnum } from 'sipapu/dist/src/services/song'
+import AdtRadEvent, { getAdtRadSong } from '../events/AdtRadEvent'
 import SpotifyEvent from '../events/SpotifyEvent'
-import { shuffleWeightedSong } from '../shuffle'
+import { PlayerEvent, shuffleWeightedSongWithEvents } from '../shuffle'
 
 interface ShufflerProps {
   spotifyPlayer: React.RefObject<SpotifyWebPlayback>
@@ -16,12 +18,13 @@ interface ShufflerProps {
 
 const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
 
-  const [queue, setQueue]       = useState<SongType[]>([])
-  const [current, setCurrent]   = useState<SongType>()
+  const [queue, setQueue]       = useState<PlayerEvent[]>([])
+  const [current, setCurrent]   = useState<PlayerEvent>()
   const [user, setUser]         = useState<ProfileType>()
   const [empty, setEmpty]       = useState<boolean>(false)
   const [paused, setPaused]     = useState<boolean>(false)
   const [finished, setFinished] = useState<boolean>(false)
+  const [playlist, setPlaylist] = useState<PlaylistWithSongsType>()
 
   // Every time songFinished changes, we know that the previous song has ended
   // so we can select the next one
@@ -40,9 +43,17 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
   useEffect(() => {
     if (!current) return
 
-    spotifyPlayer.current?.play(current.platformId)
-    window.sipapu.Session.setCurrentlyPlaying(session.id, current.id)
-    window.sipapu.Song.incrmentPlayCount(current.id)
+    if (current === 'adtrad') {
+      //
+    } else if (current.songType === SongEnum.SPOTIFY) {
+      spotifyPlayer.current?.play(current.platformId)
+      window.sipapu.Song.incrmentPlayCount(current.id)
+      window.sipapu.Session.setCurrentlyPlaying(session.id, current.id)
+    } else {
+      // huilen
+    }
+    
+
     window.sipapu.Session.notifyEvent(session.id, EventTypes.PLAY_SONG, { song: current })
   }, [current])
 
@@ -103,11 +114,12 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
       q = await window.sipapu.Playlist
         .getWithSongs(session.playlistId)
         .then(p => {
+          setPlaylist(p)
           if (p.songs.length === 0) {
             setEmpty(true)
             return []
           }
-          return shuffleWeightedSong(p)
+          return shuffleWeightedSongWithEvents(p, session)
         })
       console.log(q)
     }
@@ -117,7 +129,7 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
       const rest = q.slice(1)
   
       // Fetch username
-      if (next.addedBy) {
+      if (typeof next !== 'string' && next.addedBy) {
         setUser(await window.sipapu.Profile.get(next.addedBy))
       }
   
@@ -141,7 +153,18 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
     </div>
   }
 
-  return current === undefined ? null : <SpotifyEvent song={current!} paused={paused} session={session} user={user!}/>
+  if (current === undefined) {
+    return null
+  }
+
+  if (current === 'adtrad') {
+
+    spotifyPlayer.current?.play(getAdtRadSong())
+
+    return <AdtRadEvent playlist={playlist!} />
+  } 
+
+  return <SpotifyEvent song={current!} paused={paused} session={session} user={user!}/>
 }
 
 export default Shuffler
