@@ -16,21 +16,26 @@ interface ShufflerProps {
 
 const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
 
-  const [queue, setQueue]     = useState<SongType[]>([])
-  const [current, setCurrent] = useState<SongType>()
-  const [user, setUser]       = useState<ProfileType>()
-  const [empty, setEmpty]     = useState<boolean>(false)
-  const [paused, setPaused]   = useState<boolean>(false)
+  const [queue, setQueue]       = useState<SongType[]>([])
+  const [current, setCurrent]   = useState<SongType>()
+  const [user, setUser]         = useState<ProfileType>()
+  const [empty, setEmpty]       = useState<boolean>(false)
+  const [paused, setPaused]     = useState<boolean>(false)
+  const [finished, setFinished] = useState<boolean>(false)
 
   // Every time songFinished changes, we know that the previous song has ended
   // so we can select the next one
+  useEffect(() => {
+    setFinished(f => !f)
+  }, [songFinished])
+
   useEffect(() => {
     const fun = async () => {
       await next()
     }
 
     fun()
-  }, [songFinished])
+  }, [finished])
 
   useEffect(() => {
     if (!current) return
@@ -57,8 +62,7 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
       case EventTypes.SPOTIFY_SONG_ADDED:
         if (queue.length === 0) {
           setEmpty(false)
-          console.log(queue)
-          // location.reload()
+          location.reload()
         } 
         break
   
@@ -67,10 +71,12 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
         break
   
       case EventTypes.SKIP_SONG:
-        await next()
+        setFinished(f => !f)
         break
   
       case EventTypes.PLAY_SONG:
+      case EventTypes.SONG_FINISHED:
+      case EventTypes.PLAYLIST_FINISHED:
         // we emit these events so ignore this
         break
         
@@ -88,7 +94,10 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
   }, [session])
 
   const next = async () => {
+    console.log('QUEUE:', queue)
+
     let q = queue
+
 
     if (queue.length === 0) {
       q = await window.sipapu.Playlist
@@ -112,8 +121,8 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
         setUser(await window.sipapu.Profile.get(next.addedBy))
       }
   
-      setCurrent(next)
       setQueue(rest)
+      setCurrent(next)
     }
   }
 
