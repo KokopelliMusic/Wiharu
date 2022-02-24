@@ -24,12 +24,14 @@ const SpotifyEvent = (props: SpotifyEventProps) => {
     if (props.song) {
       setProgress(0)
     }
+
+    if (progressInterval === undefined) {
+      makeInterval(1000)
+    }
   }, [props.song])
 
   useEffect(() => {
-    if (progressInterval === undefined) {
-      makeInterval(1000)
-    } else {
+    if (props.paused) {
       clearInterval(progressInterval)
       setProgressInterval(undefined)
     }
