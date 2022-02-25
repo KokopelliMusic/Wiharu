@@ -44,7 +44,7 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
     if (!current) return
 
     if (current === 'adtrad') {
-      //
+      spotifyPlayer.current?.play(getAdtRadSong())
     } else if (current.songType === SongEnum.SPOTIFY) {
       spotifyPlayer.current?.play(current.platformId)
       window.sipapu.Song.incrmentPlayCount(current.id)
@@ -71,7 +71,7 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
   
       case EventTypes.YOUTUBE_SONG_ADDED:
       case EventTypes.SPOTIFY_SONG_ADDED:
-        if (queue.length === 0) {
+        if (queue.length === 0 && empty === true) {
           setEmpty(false)
           location.reload()
         } 
@@ -158,9 +158,6 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
   }
 
   if (current === 'adtrad') {
-
-    spotifyPlayer.current?.play(getAdtRadSong())
-
     return <AdtRadEvent playlist={playlist!} />
   } 
 
