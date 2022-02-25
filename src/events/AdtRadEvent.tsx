@@ -26,7 +26,7 @@ interface AdtRadEventProps {
 
 const AdtRadEvent = ({ playlist }: AdtRadEventProps) => {
 
-  const [users, setUsers] = useState<string[]>([])
+  const [users, setUsers]     = useState<string[]>([])
   const [loading, setLoading] = useState<boolean>(true)
 
   useEffect(() => {
