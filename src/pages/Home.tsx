@@ -1,6 +1,6 @@
+import { Account, Models } from 'appwrite'
 import React, { useEffect, useState } from 'react'
-import { EventTypes, SessionCreatedEventData } from 'sipapu/dist/src/events'
-import { saveCode, saveSettings, saveSpotify, saveUid } from '../data'
+import { saveCode } from '../data'
 import FullscreenLoading from './FullscreenLoading'
 
 const LOADING_TIMEOUT = 2500
@@ -9,10 +9,18 @@ const Home = () => {
 
   const [code, setCode]       = useState<string>('')
   const [loading, setLoading] = useState<boolean>(true)
-
+  const [user, setUser]       = useState<Models.User<Models.Preferences>>()
+  
   useEffect(() => {
-    window.sipapu.Session.new()
-      .then(setCode)
+    fetch(process.env.REACT_APP_TAWA_URL + 'session/create-temp')
+      .then(res => res.json())
+      .then(async (res) => {
+        const acc = new Account(window.api)
+        const user = await acc.get()
+        setUser(user)
+        return res
+      })
+      .then(res => setCode(res.session_id))
       .then(() => setTimeout(() => setLoading(false), LOADING_TIMEOUT))
       .catch(err => alert(err))
   }, [])
@@ -20,30 +28,31 @@ const Home = () => {
   useEffect(() => {
     if (!code || code === undefined) return
 
-    window.sipapu.Session.setSessionId(code)
+    console.log(`Listening to ${code} as user ${user?.$id}!`)
 
-    const cleanup = window.sipapu.Session.watch(code, async event => {
-      if (event.eventType === EventTypes.SESSION_CREATED) {
-        // Session has been claimed, so save this info and redirect to the player
-        const d = JSON.parse(event.data as unknown as string) as SessionCreatedEventData
-        if (!d.error) {
-          saveSettings(d.settings)
-          saveCode(event.session)
-          saveUid(d.userId)
-          saveSpotify({ accessToken: d.spotifyAccessToken, refreshToken: d.spotifyRefreshToken })
-          window.location.href = '/player'
-        } else {
-          console.error('Something went wrong with this event:', event)
-          alert('Something went wrong, try reloading')
-        }
+    const channel = `databases.main.collections.temp_session.documents.${code}`
+
+    const unsub = window.api.subscribe(channel, async event => {
+      if (event.events.includes(channel + '.delete')) {
+        console.log('Temp session deleted, redirecting to player!')
+        saveCode(code)
+
+        await fetch(process.env.REACT_APP_TAWA_URL + 'session/register-player', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            user_id: user?.$id,
+            session_id: code
+          })
+        })
+
+        window.location.href = '/player'
       }
     })
 
-    // this is a very interesting cleanup function lol
-    return () => {
-      const fun = async () => (await cleanup)()
-      fun()
-    }
+    return unsub
   }, [code])
 
   if (loading) 

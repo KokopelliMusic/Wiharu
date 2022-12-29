@@ -2,13 +2,13 @@ import React, { useEffect, useRef, useState } from 'react'
 import { emitEvent, getCode } from '../data'
 import SpotifyWebPlayback from 'react-spotify-web-playback-sdk-headless'
 import FullscreenLoading from './FullscreenLoading'
-import Shuffler from './Shuffler'
+import NewShuffler from './NewShuffler'
 import { EventTypeEnum, Session, Spotify } from 'sipapu-2'
 import { Account, Models } from 'appwrite'
 
 const LOADING_TIMEOUT = 1000
 
-const Player = () => {
+const NewPlayer = () => {
   const player = useRef<SpotifyWebPlayback>(null)
 
   const [session, setSession]   = useState<Session>()
@@ -73,12 +73,13 @@ const Player = () => {
 
   const onSpotifyReady = () => setSpotifyLoading(false)
 
-  const onSongFinished = async () => {
+  const onSongFinished = () => {
+    console.log('Song finished')
     setNextSong(p => !p)
     if (session && user) {
       emitEvent(EventTypeEnum.SongFinished, session.$id, user.$id, {})
     } else {
-      console.error('Session and/or user is undefined')
+      alert('Sesion and/or user is undefined!')
     }
   }
 
@@ -102,7 +103,7 @@ const Player = () => {
       songFinished={onSongFinished}
     />
 
-    {spotifyLoading ? null : <Shuffler
+    {spotifyLoading ? null : <NewShuffler
       session={session}    
       songFinished={nextSong}
       user={user}
@@ -110,4 +111,4 @@ const Player = () => {
   </div>
 }
 
-export default Player
+export default NewPlayer

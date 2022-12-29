@@ -1,21 +1,19 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import React, { useEffect, useState } from 'react'
-import { ProfileType } from 'sipapu/dist/src/services/profile'
-import { SessionType } from 'sipapu/dist/src/services/session'
-import { SongType } from 'sipapu/dist/src/services/song'
+import { Session, Song } from 'sipapu-2'
 
 interface SpotifyEventProps {
-  song: SongType
-  session: SessionType
-  user: ProfileType
+  song: Song
+  session: Session
   paused: boolean
 }
+
 
 const SpotifyEvent = (props: SpotifyEventProps) => {
 
   const [progressInterval, setProgressInterval] = useState<number | undefined>(undefined)
   const [progress, setProgress]                 = useState<number>(0)
-
+  
   useEffect(() => {
     return () => clearInterval(progressInterval)
   }, [])
@@ -31,6 +29,7 @@ const SpotifyEvent = (props: SpotifyEventProps) => {
   }, [props.song])
 
   useEffect(() => {
+    console.log('WTF', props.paused)
     if (props.paused) {
       clearInterval(progressInterval)
       setProgressInterval(undefined)
@@ -38,15 +37,18 @@ const SpotifyEvent = (props: SpotifyEventProps) => {
   }, [props.paused])
 
   useEffect(() => {
-    if (progress >= props.song.length!) {
+    if (progress === 0) return
+
+    const length = props.song.length
+    const maxProgress = length - (length % 1000)
+    if (progress >= maxProgress) {
       clearInterval(progressInterval)
       setProgressInterval(undefined)
     }
   }, [progress])
 
   const makeInterval = (increment: number) => {
-    const i = window.setInterval(() => setProgress(p => p + increment), 1000)
-    setProgressInterval(i)
+    setProgressInterval(window.setInterval(() => setProgress(p => p + increment), 1000))
   }
 
   return <div 
@@ -112,13 +114,13 @@ const SpotifyEvent = (props: SpotifyEventProps) => {
           </div>
 
           <div className="pt-3 pl-1.5 text-5xl text-red-500">
-            {props.song.artist}
+            {props.song.artists}
           </div>
           <div className="pt-3 pl-2 text-2xl">
-            Added by <span className="text-red-500">{props.user.username}</span> 
+            Added by <span className="text-red-500">{props.song.user_name}</span> 
           </div>
           <div className="pt-4 pl-2 text-2xl">
-            Code <span className="text-red-500">{props.session.id}</span>
+            Code <span className="text-red-500">{props.session.$id}</span>
           </div>
         </div>
       </div>
@@ -128,7 +130,7 @@ const SpotifyEvent = (props: SpotifyEventProps) => {
 }
 
 const calcTimeStyle = (time: number, length: number) => {
-  const percent = time / length
+  const percent = time / (length - 1000)
   return `${percent * 100}%`
 }
 

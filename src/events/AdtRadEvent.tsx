@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { PlaylistWithSongsType } from 'sipapu/dist/src/services/playlist'
+import { Session } from 'sipapu-2'
 import Wheel from '../components/Wheel'
+import { getUsernamesFromCurrentSession } from '../data'
 import FullscreenLoading from '../pages/FullscreenLoading'
 
 const WAIT_TIME = 30_000
@@ -16,7 +17,7 @@ export const getAdtRadSong = () => {
 }
 
 interface AdtRadEventProps {
-  playlist: PlaylistWithSongsType
+  session: Session
 }
 
 /**
@@ -24,17 +25,25 @@ interface AdtRadEventProps {
  * https://codepen.io/barney-parker/pen/OPyYqy
  */
 
-const AdtRadEvent = ({ playlist }: AdtRadEventProps) => {
+const AdtRadEvent = ({ session }: AdtRadEventProps) => {
 
-  const [users, setUsers]     = useState<string[]>([])
-  const [loading, setLoading] = useState<boolean>(true)
+  const [loading, setLoading]         = useState<boolean>(true)
+  const [fakeLoading, setFakeLoading] = useState<boolean>(true)
+  const [users, setUsers]             = useState<string[]>([])
 
   useEffect(() => {
-    playlist.users.forEach(u => {
-      window.sipapu.Profile.get(u).then(p => setUsers(u => [...u, p.username]))
-    })
-    setTimeout(() => setLoading(false), LOAD_TIME)
+    (async () => {
+      getUsernamesFromCurrentSession(session)
+        .then(res => setUsers(res.users))
+        .then(() => setFakeLoading(false))
+    })()
   }, [])
+
+  useEffect(() => {
+    if (!fakeLoading) {
+      setTimeout(() => setLoading(false), LOAD_TIME)
+    }
+  }, [fakeLoading])
 
   if (loading) {
     return <FullscreenLoading />

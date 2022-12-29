@@ -2,7 +2,7 @@ import React from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Home from './pages/Home'
 import NotFound from './pages/NotFound'
-import Player from './pages/Player'
+import NewPlayer from './pages/NewPlayer'
 
 
 function App() {
@@ -10,7 +10,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home/>} />
-        <Route path="player" element={<Player />} />
+        <Route path="player" element={<NewPlayer />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

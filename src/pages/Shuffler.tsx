@@ -1,30 +1,28 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
+import { Models, Query } from 'appwrite'
 import React, { useEffect, useState } from 'react'
 import SpotifyWebPlayback from 'react-spotify-web-playback-sdk-headless'
-import { EventTypes } from 'sipapu/dist/src/events'
-import { PlaylistWithSongsType } from 'sipapu/dist/src/services/playlist'
-import { ProfileType } from 'sipapu/dist/src/services/profile'
-import { SessionType } from 'sipapu/dist/src/services/session'
-import { SongEnum } from 'sipapu/dist/src/services/song'
+import { Session, Song, Event, EventTypeEnum, SongTypeEnum, PlayerEvents } from 'sipapu-2'
+import { shuffleWeightedSongWithEvents } from '../shuffle'
 import AdtRadEvent, { getAdtRadSong } from '../events/AdtRadEvent'
+import { emitEvent, incrementPlayCount, setCurrentlyPlaying } from '../data'
 import SpotifyEvent from '../events/SpotifyEvent'
-import { PlayerEvent, shuffleWeightedSongWithEvents } from '../shuffle'
 
 interface ShufflerProps {
   spotifyPlayer: React.RefObject<SpotifyWebPlayback>
-  session: SessionType
+  session: Session
   songFinished: boolean
+  user: Models.User<Models.Preferences>
 }
 
-const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
+const Shuffler = ({ spotifyPlayer, session, songFinished, user }: ShufflerProps) => {
 
-  const [queue, setQueue]       = useState<PlayerEvent[]>([])
-  const [current, setCurrent]   = useState<PlayerEvent>()
-  const [user, setUser]         = useState<ProfileType>()
+  const [queue, setQueue]       = useState<Song[]>([])
+  const [current, setCurrent]   = useState<Song>()
   const [empty, setEmpty]       = useState<boolean>(false)
   const [paused, setPaused]     = useState<boolean>(false)
   const [finished, setFinished] = useState<boolean>(false)
-  const [playlist, setPlaylist] = useState<PlaylistWithSongsType>()
+  const [playlist, setPlaylist] = useState<Song[]>()
 
   // Every time songFinished changes, we know that the previous song has ended
   // so we can select the next one
@@ -33,74 +31,106 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
   }, [songFinished])
 
   useEffect(() => {
-    const fun = async () => {
+    (async () => {
       await next()
-    }
-
-    fun()
+    })()
   }, [finished])
 
   useEffect(() => {
     if (!current) return
 
-    if (current === 'adtrad') {
+    let event = false
+    let event_type: PlayerEvents | undefined = undefined
+
+    console.log('Current event', current)
+    console.log('Current type', current.song_type)
+
+    switch (current.song_type) {
+    
+    case SongTypeEnum.Event:
       spotifyPlayer.current?.play(getAdtRadSong())
-    } else if (current.songType === SongEnum.SPOTIFY) {
-      spotifyPlayer.current?.play(current.platformId)
-      window.sipapu.Song.incrmentPlayCount(current.id)
-      window.sipapu.Session.setCurrentlyPlaying(session.id, current.id)
-    } else {
-      // huilen
+      event = true
+      event_type = 'adtrad'
+      break
+
+    case SongTypeEnum.Spotify:
+      console.log('Spotify!')
+      spotifyPlayer.current?.play(current.platform_id)
+      incrementPlayCount(session, current)
+      setCurrentlyPlaying(session, current, user.$id)
+      break
+
+    case SongTypeEnum.YouTube:
+      alert('YouTube functionality has not been implemented yet!')
+      break
     }
+
+    emitEvent(EventTypeEnum.Play, session.$id, user.$id, { 
+      currently_playing: JSON.stringify(current),
+      event,
+      event_type
+    })
+
+    // if (current.type === EventTypeEnum.PlayerEvent && current.type.) {
+    //   spotifyPlayer.current?.play(getAdtRadSong())
+    // } else if (current.payload?.)
+
+    // if (current === 'adtrad') {
+    //   spotifyPlayer.current?.play(getAdtRadSong())
+    // } else if (current.songType === SongEnum.SPOTIFY) {
+    //   spotifyPlayer.current?.play(current.platformId)
+    //   window.sipapu.Song.incrmentPlayCount(current.id)
+    //   window.sipapu.Session.setCurrentlyPlaying(session.id, current.id)
+    // } else {
+    //   // huilen
+    // }
     
 
-    window.sipapu.Session.notifyEvent(session.id, EventTypes.PLAY_SONG, { song: current })
+    // window.sipapu.Session.notifyEvent(session.id, EventTypes.PLAY_SONG, { song: current })
   }, [current])
 
   useEffect(() => {
     if (!session) return
 
-    const cleanup = window.sipapu.Session.watch(session.id, async event => {
-      switch (event.eventType) {
-
-      case EventTypes.PLAY_PAUSE:
-        // TODO: handle for all players
+    const cleanup = window.api.subscribe('databases.main.collections.event.documents', payload => {
+      const event = payload.payload as Event
+      switch (event.type) {
+        
+      case EventTypeEnum.PlayPause:
         spotifyPlayer.current?.togglePlay()
         setPaused(p => !p)
         break
-  
-      case EventTypes.YOUTUBE_SONG_ADDED:
-      case EventTypes.SPOTIFY_SONG_ADDED:
+
+      case EventTypeEnum.YouTubeSongAdded:
+      case EventTypeEnum.SpotifySongAdded:
         if (queue.length === 0 && empty === true) {
           setEmpty(false)
           location.reload()
-        } 
-        break
-  
-      case EventTypes.PREVIOUS_SONG:
-        spotifyPlayer.current?.seek(0)
-        break
-  
-      case EventTypes.SKIP_SONG:
-        setFinished(f => !f)
-        break
-  
-      case EventTypes.PLAY_SONG:
-      case EventTypes.SONG_FINISHED:
-      case EventTypes.PLAYLIST_FINISHED:
-        // we emit these events so ignore this
+        }
         break
         
-      default:
-        console.log('I do not know (yet) what to do with this eventType:', event.eventType)
+      case EventTypeEnum.Previous:
+        spotifyPlayer.current?.seek(0)
         break
-      
+
+      case EventTypeEnum.Skip:
+        setFinished(f => !f)
+        break
+
+      case EventTypeEnum.Play:
+      case EventTypeEnum.SongFinished:
+      case EventTypeEnum.PlaylistFinished:
+        // We emit these events so we ignore them
+        break
+
+      default:
+        console.log('I do not know (yet) what to do with this event:', event)
+        break        
       }
     })
 
     return () => {
-      const fun = async () => (await cleanup)()
-      fun()
+      cleanup()
     }
   }, [session])
 
@@ -109,29 +139,36 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
 
     let q = queue
 
-
     if (queue.length === 0) {
-      q = await window.sipapu.Playlist
-        .getWithSongs(session.playlistId)
-        .then(p => {
-          setPlaylist(p)
-          if (p.songs.length === 0) {
-            setEmpty(true)
-            return []
-          }
-          return shuffleWeightedSongWithEvents(p, session)
-        })
-      console.log(q)
+      const query = await window.db.listDocuments('song', [
+        Query.equal('playlist_id', session.playlist_id)
+      ])
+
+      const songs = query.documents as unknown as Song[]
+
+      setPlaylist(songs)
+      if (query.total === 0) {
+        setEmpty(true)
+        q = []
+      }
+      q = shuffleWeightedSongWithEvents(songs, session)
+
+      // q = await window.sipapu.Playlist
+      //   .getWithSongs(session.playlist_id)
+      //   .then(p => {
+      //     setPlaylist(p)
+      //     if (p.songs.length === 0) {
+      //       setEmpty(true)
+      //       return []
+      //     }
+      //     return shuffleWeightedSongWithEvents(p, session)
+      //   })
+      // console.log(q)
     }
 
     if (q.length !== 0) {
       const next = q[0]
       const rest = q.slice(1)
-  
-      // Fetch username
-      if (typeof next !== 'string' && next.addedBy) {
-        setUser(await window.sipapu.Profile.get(next.addedBy))
-      }
   
       setQueue(rest)
       setCurrent(next)
@@ -157,11 +194,11 @@ const Shuffler = ({ spotifyPlayer, session, songFinished }: ShufflerProps) => {
     return null
   }
 
-  if (current === 'adtrad') {
-    return <AdtRadEvent playlist={playlist!} />
+  if (current.song_type === SongTypeEnum.Event) {
+    return <AdtRadEvent session={session!} />
   } 
 
-  return <SpotifyEvent song={current!} paused={paused} session={session} user={user!}/>
+  return <SpotifyEvent song={current!} paused={paused} session={session} />
 }
 
 export default Shuffler
