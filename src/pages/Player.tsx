@@ -1,19 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { SessionType } from 'sipapu/dist/src/services/session'
-import { getCode, getSpotify, getUid, SpotifyToken } from '../data'
 import SpotifyWebPlayback from 'react-spotify-web-playback-sdk-headless'
 import FullscreenLoading from './FullscreenLoading'
 import Shuffler from './Shuffler'
-import { EventTypes } from 'sipapu/dist/src/events'
+import { cache } from '../data/cache'
+import { Session, Settings, Spotify, User } from '../types/tawa'
+import { client } from '../data/client'
 
 const LOADING_TIMEOUT = 500
 
 const Player = () => {
   const player = useRef<SpotifyWebPlayback>(null)
 
-  const [session, setSession]   = useState<SessionType | undefined>(undefined)
-  const [spotify, setSpotify]   = useState<SpotifyToken | undefined>(undefined)
-  const [uid, setUid]           = useState<string | undefined>(undefined)
+  const [spotify, setSpotify]   = useState<Spotify>()
+  const [user, setUser]         = useState<User>()
   
   const [loading, setLoading]               = useState<boolean>(true)
   const [spotifyLoading, setSpotifyLoading] = useState<boolean>(true)
@@ -22,25 +21,20 @@ const Player = () => {
   const [nextSong, setNextSong] = useState<boolean>(false)
   
   useEffect(() => {
-    const code = getCode()
+    const session = cache.get<Session>('session')
+    const spotify = cache.get<Spotify>('spotify')
+    const user = cache.get<User>('user')
+    const settings = cache.get<Settings>('settings')
 
-    if (!code) {
+    if (!session || !settings || !spotify || !user) {
       alert('I cannot seem to find your session, sending you back to the home page in 5 seconds')
       setTimeout(() => window.location.href = '/', 5000)
     }
 
-    window.sipapu.Session.get(code)
-      .then(setSession)
-      .then(() => getSpotify())
-      .then(setSpotify)
-      .then(() => getUid())
-      .then(setUid)
-      .then(() => setTimeout(() => setLoading(false), LOADING_TIMEOUT))
-      .catch(err => {
-        console.error(err)
-        alert('I cannot seem to find your session, sending you back to the home page in 5 seconds')
-        setTimeout(() => window.location.href = '/', 5000)
-      })
+    setSpotify(spotify)
+    setUser(user)
+    setTimeout(() => setLoading(false), LOADING_TIMEOUT)
+
   }, [])
 
   useEffect(() => {
@@ -56,18 +50,47 @@ const Player = () => {
    */
 
   const onTokenRefresh = (token: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    window.sipapu.Spotify.updateToken(token, new Date(Date.now() + 60 * 60 * 1000), uid!)
+    const newExpiration = new Date(Date.now() + 60 * 60 * 1000)
+    // Update the token in the cache
+    const newSpotify: Spotify = { 
+      refresh_token: spotify!.refresh_token,
+      user: spotify!.user,
+      access_token: token, 
+      expires_at: newExpiration.getTime() 
+    }
+
+    // Update the state and cache
+    setSpotify(newSpotify)
+    cache.set('spotify', newSpotify)
+
+    // Update the token on the server
+    client.req('update_spotify', { access_token: token, expires_at: newExpiration})
       .catch(console.error)
   }
 
-  const onSpotifyReady = () => {
-    setSpotifyLoading(false)
+  const onSpotifyReady = async () => {
+    // First, sleep 5 seconds
+    await new Promise(resolve => setTimeout(resolve, 5000))
+
+    // Now, we need to transfer the playback to the device via the spotify api
+    fetch('https://api.spotify.com/v1/me/player', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${spotify?.access_token}`
+      },
+      body: JSON.stringify({
+        device_ids: [player.current?.state.deviceId],
+      })
+    }).then(res => console.log('Transfered playback to device', res))
+      .then(() => setSpotifyLoading(false))
+      .catch(err => console.error('Failed to transfer playback to device', err))
   }
 
   const onSongFinished = async () => {
+    console.log('Song finished!')
     setNextSong(p => !p)
-    window.sipapu.Session.notifyEvent(session!.id, EventTypes.SONG_FINISHED, {})
+    client.pushEvent('song_finished', {})
   }
 
   if (loading) return <FullscreenLoading />
@@ -80,8 +103,8 @@ const Player = () => {
       debug
       logging
 
-      accessToken={spotify?.accessToken}
-      refreshToken={spotify?.refreshToken}
+      accessToken={spotify?.access_token}
+      refreshToken={spotify?.refresh_token}
       refreshTokenAutomatically
       refreshTokenUrl={process.env.REACT_APP_TOKEN_REFRESH_URL}
 
@@ -92,7 +115,6 @@ const Player = () => {
 
     {spotifyLoading ? null : <Shuffler
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      session={session!}    
       songFinished={nextSong}
       spotifyPlayer={player} />}
   </div>
