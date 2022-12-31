@@ -1,47 +1,56 @@
-import React, { useEffect, useState } from 'react'
-import { PlaylistWithSongsType } from 'sipapu/dist/src/services/playlist'
+import React from 'react'
 import Wheel from '../components/Wheel'
-import FullscreenLoading from '../pages/FullscreenLoading'
+import { cache } from '../data/cache'
+import { Playlist, Song, User } from '../types/tawa'
 
 const WAIT_TIME = 30_000
-const LOAD_TIME = 5_000
 
-export const getAdtRadSong = () => {
-  const songs = [
-    '4cCL2ohDQEOV1qMeEoUwma'    // Bier - Steen
-    , '2bJaewMbxlwnm69zvOAq3s'  // Adje voor de Sfeer - Rene Karst
+export const getAdtRadSong = (playlistID: number) => {
+  const added_by: User = {
+    id: -1,
+    username: 'Kokopelli',
+    profile_picture: process.env.PUBLIC_URL + '/kokopelli.png'
+  }
+  
+  const songs: Song[] = [
+    // {
+    //   id: '-1',
+    //   title: 'Bier',
+    //   artists: 'Steen',
+    //   album: 'De Vader',
+    //   length: 225053,
+    //   cover: 'https://i.scdn.co/image/ab67616d0000b273f3566be24be3b427abf48d2d',
+    //   added_by,
+    //   song_type: 'spotify',
+    //   platform_id: 'spotify:track:4cCL2ohDQEOV1qMeEoUwma',
+    //   playlist_id: playlistID
+    // },
+    {
+      id: -1,
+      title: 'Atje voor de Sfeer',
+      artists: 'Rene Karst',
+      album: 'Atje voor de Sfeer - En Andere Sfeermakers',
+      length: 198222,
+      cover: 'https://i.scdn.co/image/ab67616d0000b273437e84d6f118fe0ef8e17af8',
+      added_by,
+      song_type: 'spotify',
+      platform_id: 'spotify:track:2bJaewMbxlwnm69zvOAq3s',
+      playlist_id: playlistID,
+      play_count: 0
+    }
   ]
 
-  return songs[Math.floor(Math.random() * songs.length)]
+  return songs[0]
 }
 
 interface AdtRadEventProps {
-  playlist: PlaylistWithSongsType
+  playlist: Playlist
 }
-
-/**
- * ty
- * https://codepen.io/barney-parker/pen/OPyYqy
- */
 
 const AdtRadEvent = ({ playlist }: AdtRadEventProps) => {
 
-  const [users, setUsers]     = useState<string[]>([])
-  const [loading, setLoading] = useState<boolean>(true)
-
-  useEffect(() => {
-    playlist.users.forEach(u => {
-      window.sipapu.Profile.get(u).then(p => setUsers(u => [...u, p.username]))
-    })
-    setTimeout(() => setLoading(false), LOAD_TIME)
-  }, [])
-
-  if (loading) {
-    return <FullscreenLoading />
-  }
-
   return <div className="w-screen h-screen flex justify-center">
-    <Wheel timeout={WAIT_TIME} items={users} />
+    <Wheel timeout={WAIT_TIME} items={cache.get<User[]>('users')!.map(u => u.username)} />
   </div>
 }
 
