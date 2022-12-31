@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { EventTypes, SessionCreatedEventData } from 'sipapu/dist/src/events'
-import { saveCode, saveSettings, saveSpotify, saveUid } from '../data'
+import { cache } from '../data/cache'
+// import { saveSessionID, saveSettings, saveSpotify, saveUid } from '../data'
+import { client, WSClient } from '../data/client'
+import { Event } from '../types/tawa'
 import FullscreenLoading from './FullscreenLoading'
 
 const LOADING_TIMEOUT = 2500
@@ -9,42 +11,57 @@ const Home = () => {
 
   const [code, setCode]       = useState<string>('')
   const [loading, setLoading] = useState<boolean>(true)
+  const [event, setEvent]     = useState<Event>()
 
   useEffect(() => {
-    window.sipapu.Session.new()
-      .then(setCode)
+    client.req('create_temp_session', {}, false)
+      .then(res => {
+        console.log('New session: ', res)
+        setCode(res.session_id)
+      })
       .then(() => setTimeout(() => setLoading(false), LOADING_TIMEOUT))
-      .catch(err => alert(err))
+      .catch(err => {
+        console.error(err)
+        alert(err.message)
+      })
   }, [])
 
   useEffect(() => {
     if (!code || code === undefined) return
 
-    window.sipapu.Session.setSessionId(code)
+    console.log('Listening on ' + code + '...')
 
-    const cleanup = window.sipapu.Session.watch(code, async event => {
-      if (event.eventType === EventTypes.SESSION_CREATED) {
-        // Session has been claimed, so save this info and redirect to the player
-        const d = JSON.parse(event.data as unknown as string) as SessionCreatedEventData
-        if (!d.error) {
-          saveSettings(d.settings)
-          saveCode(event.session)
-          saveUid(d.userId)
-          saveSpotify({ accessToken: d.spotifyAccessToken, refreshToken: d.spotifyRefreshToken })
-          window.location.href = '/player'
-        } else {
-          console.error('Something went wrong with this event:', event)
-          alert('Something went wrong, try reloading')
-        }
-      }
-    })
+    const ws = new WSClient(code, setEvent)
 
-    // this is a very interesting cleanup function lol
     return () => {
-      const fun = async () => (await cleanup)()
-      fun()
+      alert()
+      console.log('Closing connection...')
+      ws.close()
+      alert()
     }
   }, [code])
+
+  useEffect(() => {
+    if (!event) return
+
+    if (event.event_type === 'session_created') {
+      console.log('Session created!', event)
+      // @ts-expect-error hou je bek ts ik weet wat ik doe
+      const d = JSON.parse(event.data)
+
+      cache.set('session', d.session)
+      cache.set('settings', d.settings)
+      cache.set('spotify', d.spotify)
+      cache.set('user', d.user)
+      cache.set('user_token', d.user_token)
+
+      window.location.href = '/player'
+
+    } else {
+      console.log('Other event:', event)
+    }
+  
+  }, [event])
 
   if (loading) 
     return <FullscreenLoading />
