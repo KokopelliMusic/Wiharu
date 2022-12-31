@@ -1,13 +1,10 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import React, { useEffect, useState } from 'react'
-import { ProfileType } from 'sipapu/dist/src/services/profile'
-import { SessionType } from 'sipapu/dist/src/services/session'
-import { SongType } from 'sipapu/dist/src/services/song'
+import { Session, Song } from '../types/tawa'
 
 interface SpotifyEventProps {
-  song: SongType
-  session: SessionType
-  user: ProfileType
+  song: Song
+  session: Session
   paused: boolean
 }
 
@@ -112,13 +109,13 @@ const SpotifyEvent = (props: SpotifyEventProps) => {
           </div>
 
           <div className="pt-3 pl-1.5 text-5xl text-red-500">
-            {props.song.artist}
+            {props.song.artists}
           </div>
           <div className="pt-3 pl-2 text-2xl">
-            Added by <span className="text-red-500">{props.user.username}</span> 
+            Added by <span className="text-red-500">{props.song.added_by.username}</span> 
           </div>
           <div className="pt-4 pl-2 text-2xl">
-            Code <span className="text-red-500">{props.session.id}</span>
+            Code <span className="text-red-500">{props.session.session_id}</span>
           </div>
         </div>
       </div>

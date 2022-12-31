@@ -6,3 +6,6 @@ build: lint
 
 lint:
 	npx eslint --fix --ext .tsx,.ts,.js src
+
+test:
+	npx jest shuffle.test.ts
