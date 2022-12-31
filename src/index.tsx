@@ -14,13 +14,13 @@ const Index = () => {
   useEffect(() => {
     setSession(window.sipapu.client.auth.session())
 
-    const code = localStorage.getItem('sipapu:session_code')
+    const session_id = localStorage.getItem('sipapu::session_id')
 
-    if (code) {
-      window.sipapu.Session.setSessionId(code)
+    if (session_id) {
+      // TODO
+      // window.sipapu.Session.setSessionId(code)
     }
 
-    window.sipapu.client.auth.onAuthStateChange((_event, session) => setSession(session))
   }, [])
 
   return <Context.Provider value={session}>
